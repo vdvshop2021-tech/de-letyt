@@ -38,4 +38,148 @@
 
         /* Бічна панель (стиль Небосхилу) */
         .sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid #334155; display: flex; flex-direction: column; z-index: 1000; box-shadow: -4px 0 12px rgba(0,0,0,0.3); transition: transform 0.3s; }
-        .sidebar-header { padding: 15px; border-bottom: 1px solid #334155;
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #334155; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .targets-list { flex-grow: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        
+        .target-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; }
+        .target-card:hover { border-color: var(--accent); background: #131c31; }
+        .target-card.danger { border-left: 4px solid var(--danger); }
+        .target-title { font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .target-info { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+        /* Нижня навігація */
+        .bottom-nav { position: absolute; bottom: 20px; left: 20px; background: var(--bg-card); padding: 8px; border-radius: 12px; display: flex; gap: 6px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.4); border: 1px solid #334155; }
+        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .nav-btn.active { background: var(--accent); color: white; font-weight: 600; }
+        .nav-btn:hover { background: #334155; color: white; }
+
+        /* Адаптивність для мобільних */
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column-reverse; }
+            .sidebar { width: 100%; height: 200px; border-left: none; border-top: 1px solid #334155; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-area">
+            <div class="logo-badge">LIVE</div>
+            <div class="header-title">
+                <h1>ДЕ ЛЕТИТЬ</h1>
+                <p>Моніторинг повітряного простору</p>
+            </div>
+        </div>
+        <div class="header-buttons">
+            <button class="btn btn-accent" id="siren-btn">🚨 Статус тривог</button>
+            <button class="btn" id="filter-btn">⚙️ Фільтри</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>📡 Активні цілі в секторі</span>
+                <span id="target-count" style="background:#ef4444; padding:2px 8px; border-radius:12px; font-size:12px; color:white;">3</span>
+            </div>
+            <div class="targets-list" id="list-container">
+                <!-- Динамічний список цілей -->
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-btn active" data-tab="radar">📡 Обстановка</button>
+        <button class="nav-btn" data-tab="dome">🛡️ Мій купол</button>
+        <button class="nav-btn" data-tab="about">ℹ️ Про нас</button>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 1. Ініціалізація карти (центр України)
+        var map = L.map('map', { zoomControl: false }).setView([48.3794, 31.1656], 6);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // Темний шар карти високої деталізації (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        // 2. Дані повітряних об'єктів (симуляція радара)
+        const targets = [
+            { id: 1, lat: 46.9750, lng: 31.9946, title: "Ціль #104 (Миколаївщина)", speed: "140 км/год", course: "Пн-Сх", status: "У русі" },
+            { id: 2, lat: 48.4924, lng: 32.2647, title: "Ціль #105 (Кіровоградщина)", speed: "180 км/год", course: "Схід", status: "У русі" },
+            { id: 3, lat: 49.8397, lng: 24.0297, title: "Ціль #106 (Західний регіон)", speed: "95 км/год", course: "Південь", status: "Контроль" }
+        ];
+
+        const markersLayer = L.layerGroup().addTo(map);
+        const listContainer = document.getElementById('list-container');
+
+        function renderRadar() {
+            markersLayer.clearLayers();
+            listContainer.innerHTML = '';
+
+            targets.forEach(t => {
+                // Додавання маркерів на мапу
+                var marker = L.circleMarker([t.lat, t.lng], {
+                    radius: 10,
+                    fillColor: "#ef4444",
+                    color: "#ffffff",
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).bindPopup(`<b>${t.title}</b><br>Швидкість: ${t.speed}<br>Курс: ${t.course}`);
+                
+                markersLayer.addLayer(marker);
+
+                // Створення карток у бічній панелі
+                var card = document.createElement('div');
+                card.className = 'target-card danger';
+                card.innerHTML = `
+                    <div class="target-title"><span>${t.title}</span> <span>🔴</span></div>
+                    <div class="target-info"><span>Швидкість: ${t.speed}</span> <span>Курс: ${t.course}</span></div>
+                `;
+                
+                // Клік по картці фокусує карту на об'єкті
+                card.addEventListener('click', () => {
+                    map.setView([t.lat, t.lng], 9);
+                    marker.openPopup();
+                });
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        renderRadar();
+
+        // 3. Інтерактивні кнопки та меню
+        document.getElementById('siren-btn').addEventListener('click', () => {
+            alert("Статус тривог: загроза застосування БПЛА та ракетного озброєння в окремих областях.");
+        });
+
+        document.getElementById('filter-btn').addEventListener('click', () => {
+            alert("Фільтрація шарів мапи та типів цілей.");
+        });
+
+        const navButtons = document.querySelectorAll('.nav-btn');
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                navButtons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const tab = this.getAttribute('data-tab');
+                if(tab === 'dome') {
+                    alert("«Мій купол»: налаштування персонального радіусу сповіщень.");
+                } else if(tab === 'about') {
+                    alert("«Де летить» — система моніторингу повітряного простору реального часу.");
+                }
+            });
+        });
+
+        // Автовиправлення рендерингу тайлів карти
+        setTimeout(function() { map.invalidateSize(); }, 200);
+    </script>
+</body>
+</html>
